@@ -1017,19 +1017,52 @@ app.post('/api/admin/import-from-legacy', async (c) => {
   }
 });
 
-let cachedIndexHtml: string | null = null;
+const INDEX_HTML_TEMPLATE = `<!DOCTYPE html>
+<html lang="id" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cek SERP Online - Pelacak Peringkat & Analisis Google SERP</title>
+    <meta name="description" content="Platform pelacak SERP profesional berbasis Deno Deploy & Turso SQLite Cloud Database." />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              slate: { 950: '#090d16', 900: '#0f172a', 800: '#1e293b' },
+              indigo: { 500: '#6366f1', 600: '#4f46e5' },
+              cyan: { 400: '#22d3ee', 500: '#06b6d4' },
+              emerald: { 400: '#34d399', 500: '#10b981' }
+            },
+            fontFamily: {
+              sans: ['Inter', 'system-ui', 'sans-serif'],
+              brand: ['Outfit', 'sans-serif']
+            }
+          }
+        }
+      }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <script type="module" crossorigin src="/assets/index-C7GWDgJU.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-Dmgoby98.css">
+  </head>
+  <body class="bg-slate-950 text-slate-100 antialiased selection:bg-indigo-500 selection:text-white min-h-screen">
+    <div id="root"></div>
+  </body>
+</html>`;
 
 function getIndexHtml(): string {
-  if (!cachedIndexHtml) {
-    try {
-      if (typeof (globalThis as any).Deno !== 'undefined') {
-        cachedIndexHtml = (globalThis as any).Deno.readTextFileSync('./dist/index.html');
-      }
-    } catch (e) {
-      console.error('[Deno HTML Read Error]', e);
+  try {
+    if (typeof (globalThis as any).Deno !== 'undefined') {
+      const text = (globalThis as any).Deno.readTextFileSync('./dist/index.html');
+      if (text && text.trim().length > 0) return text;
     }
-  }
-  return cachedIndexHtml || '<!DOCTYPE html><html><body><div id="root"></div></body></html>';
+  } catch (e) {}
+  return INDEX_HTML_TEMPLATE;
 }
 
 // Serve static frontend assets for Deno Deploy & Cloudflare Workers
