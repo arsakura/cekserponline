@@ -1,7 +1,8 @@
 {
+  "entrypoint": "main.ts",
   "tasks": {
-    "start": "deno run --allow-net --allow-read --allow-env src/backend/deno_server.ts",
-    "dev": "deno run --allow-net --allow-read --allow-env --watch src/backend/deno_server.ts"
+    "start": "deno run --allow-net --allow-read --allow-env main.ts",
+    "dev": "deno run --allow-net --allow-read --allow-env --watch main.ts"
   },
   "imports": {
     "hono": "npm:hono@^4.7.2",
