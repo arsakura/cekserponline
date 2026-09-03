@@ -3,14 +3,8 @@
   "nodeModulesDir": "auto",
   "minimumDependencyAge": 0,
   "tasks": {
-    "build": "npx vite build",
+    "build": "vite build",
     "start": "deno run --allow-net --allow-read --allow-env main.ts",
     "dev": "deno run --allow-net --allow-read --allow-env --watch main.ts"
-  },
-  "imports": {
-    "hono": "npm:hono@^4.7.2",
-    "hono/cors": "npm:hono/cors",
-    "hono/deno": "npm:hono/deno",
-    "@libsql/client": "npm:@libsql/client@^0.18.0"
   }
 }

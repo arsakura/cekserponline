@@ -8,7 +8,6 @@
     "npm:@types/react-dom@^19.0.4": "19.2.5_@types+react@19.2.18",
     "npm:@types/react@^19.0.10": "19.2.18",
     "npm:@vitejs/plugin-react@^4.3.4": "4.7.0_vite@6.4.3_@types+node@22.20.1_tsx@4.23.13",
-    "npm:hono@*": "4.13.5",
     "npm:hono@^4.7.2": "4.13.5",
     "npm:lucide-react@0.475": "0.475.0_react@19.2.8",
     "npm:react-dom@19": "19.2.8_react@19.2.8",
@@ -1862,11 +1861,6 @@
     }
   },
   "workspace": {
-    "dependencies": [
-      "npm:@libsql/client@0.18",
-      "npm:hono@*",
-      "npm:hono@^4.7.2"
-    ],
     "packageJson": {
       "dependencies": [
         "npm:@cloudflare/workers-types@^4.20250214.0",
