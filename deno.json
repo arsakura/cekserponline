@@ -2,6 +2,9 @@
   "entrypoint": "main.ts",
   "nodeModulesDir": "auto",
   "minimumDependencyAge": 0,
+  "deploy": {
+    "include": ["dist", "main.ts", "src"]
+  },
   "tasks": {
     "build": "vite build",
     "start": "deno run --allow-net --allow-read --allow-env main.ts",

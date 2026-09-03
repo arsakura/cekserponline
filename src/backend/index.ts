@@ -1017,28 +1017,42 @@ app.post('/api/admin/import-from-legacy', async (c) => {
   }
 });
 
+let cachedIndexHtml: string | null = null;
+
+function getIndexHtml(): string {
+  if (!cachedIndexHtml) {
+    try {
+      if (typeof (globalThis as any).Deno !== 'undefined') {
+        cachedIndexHtml = (globalThis as any).Deno.readTextFileSync('./dist/index.html');
+      }
+    } catch (e) {
+      console.error('[Deno HTML Read Error]', e);
+    }
+  }
+  return cachedIndexHtml || '<!DOCTYPE html><html><body><div id="root"></div></body></html>';
+}
+
 // Serve static frontend assets for Deno Deploy & Cloudflare Workers
 app.get('/*', async (c, next) => {
   if (c.req.path.startsWith('/api/')) {
     return await next();
   }
   if (typeof (globalThis as any).Deno !== 'undefined') {
-    try {
-      // @ts-ignore
-      const { serveDir, serveFile } = await import('jsr:@std/http/file-server');
-      const res = await serveDir(c.req.raw, {
-        fsRoot: './dist',
-        urlRoot: '',
-        showIndex: true,
-        enableCors: true
-      });
-      if (res.status === 404) {
-        return await serveFile(c.req.raw, './dist/index.html');
+    if (c.req.path.startsWith('/assets/') || c.req.path.endsWith('.mp3') || c.req.path.endsWith('.png') || c.req.path.endsWith('.svg') || c.req.path.endsWith('.ico')) {
+      try {
+        // @ts-ignore
+        const { serveDir } = await import('jsr:@std/http/file-server');
+        const res = await serveDir(c.req.raw, {
+          fsRoot: './dist',
+          urlRoot: '',
+          enableCors: true
+        });
+        if (res.status !== 404) return res;
+      } catch (e) {
+        console.error('[Deno serveDir Error]', e);
       }
-      return res;
-    } catch (e) {
-      console.error('[Deno serveDir Error]', e);
     }
+    return c.html(getIndexHtml());
   }
   return await serveStaticCF({ root: './' })(c, next);
 });
