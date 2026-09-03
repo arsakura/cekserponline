@@ -1024,6 +1024,7 @@ app.get('/*', async (c, next) => {
   }
   if (typeof (globalThis as any).Deno !== 'undefined') {
     try {
+      // @ts-ignore
       const { serveDir, serveFile } = await import('jsr:@std/http/file-server');
       const res = await serveDir(c.req.raw, {
         fsRoot: './dist',
