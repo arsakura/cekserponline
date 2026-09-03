@@ -1,0 +1,12 @@
+{
+  "tasks": {
+    "start": "deno run --allow-net --allow-read --allow-env src/backend/deno_server.ts",
+    "dev": "deno run --allow-net --allow-read --allow-env --watch src/backend/deno_server.ts"
+  },
+  "imports": {
+    "hono": "npm:hono@^4.7.2",
+    "hono/cors": "npm:hono/cors",
+    "hono/deno": "npm:hono/deno",
+    "@libsql/client": "npm:@libsql/client@^0.14.0"
+  }
+}

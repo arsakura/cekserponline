@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cek SERP Online - Pelacak Peringkat & Analisis Google SERP</title>
+    <meta name="description" content="Platform pelacak SERP profesional berbasis Cloudflare Worker, Pages, D1 SQLite dengan integrasi SerpApi 4 key rotation." />
+    <!-- Tailwind CSS CDN for instant live browser rendering -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              slate: {
+                950: '#090d16',
+                900: '#0f172a',
+                800: '#1e293b',
+              },
+              indigo: {
+                500: '#6366f1',
+                600: '#4f46e5',
+              },
+              cyan: {
+                400: '#22d3ee',
+                500: '#06b6d4',
+              },
+              emerald: {
+                400: '#34d399',
+                500: '#10b981',
+              }
+            },
+            fontFamily: {
+              sans: ['Inter', 'system-ui', 'sans-serif'],
+              brand: ['Outfit', 'sans-serif']
+            }
+          }
+        }
+      }
+    </script>
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-slate-950 text-slate-100 antialiased selection:bg-indigo-500 selection:text-white min-h-screen">
+    <div id="root"></div>
+    <script type="module" src="/src/frontend/main.tsx"></script>
+  </body>
+</html>
