@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { serveStatic as serveStaticCF } from 'hono/cloudflare-workers';
-import { serveStatic as serveStaticDeno } from 'hono/deno';
 import { DatabaseService, hashPassword } from './db';
 import { SerpCheckerEngine } from './serpChecker';
 import { SerpExplorerEngine } from './serpExplorer';
@@ -1022,6 +1021,7 @@ app.post('/api/admin/import-from-legacy', async (c) => {
 app.get('/*', async (c, next) => {
   if (typeof (globalThis as any).Deno !== 'undefined') {
     try {
+      const { serveStatic: serveStaticDeno } = await import('hono/deno');
       const handler = serveStaticDeno({ root: './dist' });
       return await handler(c, next);
     } catch (e) {
