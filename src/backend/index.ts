@@ -1018,11 +1018,26 @@ app.post('/api/admin/import-from-legacy', async (c) => {
 });
 
 // Serve static frontend assets for Deno Deploy & Cloudflare Workers
-app.get('/*', async (c, next) => {
+app.use('/assets/*', async (c, next) => {
   if (typeof (globalThis as any).Deno !== 'undefined') {
     try {
       const { serveStatic: serveStaticDeno } = await import('hono/deno');
-      const handler = serveStaticDeno({ root: './dist' });
+      return await serveStaticDeno({ root: './dist' })(c, next);
+    } catch (e) {
+      console.error('[Deno Assets Error]', e);
+    }
+  }
+  return await next();
+});
+
+app.get('/*', async (c, next) => {
+  if (c.req.path.startsWith('/api/')) {
+    return await next();
+  }
+  if (typeof (globalThis as any).Deno !== 'undefined') {
+    try {
+      const { serveStatic: serveStaticDeno } = await import('hono/deno');
+      const handler = serveStaticDeno({ root: './dist', path: 'index.html' });
       return await handler(c, next);
     } catch (e) {
       console.error('[Deno Static Error]', e);
