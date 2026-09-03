@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { serveStatic } from 'hono/cloudflare-workers';
+import { serveStatic as serveStaticCF } from 'hono/cloudflare-workers';
+import { serveStatic as serveStaticDeno } from 'hono/deno';
 import { DatabaseService, hashPassword } from './db';
 import { SerpCheckerEngine } from './serpChecker';
 import { SerpExplorerEngine } from './serpExplorer';
@@ -1017,7 +1018,17 @@ app.post('/api/admin/import-from-legacy', async (c) => {
   }
 });
 
-// Serve static frontend assets for Worker Assets & Worker Sites
-app.get('/*', serveStatic({ root: './' }));
+// Serve static frontend assets for Deno Deploy & Cloudflare Workers
+app.get('/*', async (c, next) => {
+  if (typeof (globalThis as any).Deno !== 'undefined') {
+    try {
+      const handler = serveStaticDeno({ root: './dist' });
+      return await handler(c, next);
+    } catch (e) {
+      console.error('[Deno Static Error]', e);
+    }
+  }
+  return await serveStaticCF({ root: './' })(c, next);
+});
 
 export default app;
