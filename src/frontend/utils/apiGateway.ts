@@ -1,6 +1,7 @@
 // API Gateway Manager for Multi-Account Cloudflare Workers Failover
 
 const DEFAULT_ENDPOINTS = [
+  '', // Localhost Node (Local SQLite Database `cekserp.db`)
   'https://cs.ratuaspal21.workers.dev', // Node Utama (Akun Cloudflare ratuaspal21@gmail.com)
   'https://cekserponline.muhammad-ardyan.workers.dev' // Node Cadangan (Akun Cloudflare muhammad.ardyan@gmail.com)
 ];
@@ -14,8 +15,15 @@ class ApiGatewayManager {
     const savedEndpoints = localStorage.getItem('cekserp_cf_endpoints');
     this.endpoints = savedEndpoints ? JSON.parse(savedEndpoints) : DEFAULT_ENDPOINTS;
 
+    if (!this.endpoints.includes('')) {
+      this.endpoints.unshift('');
+    }
+
     const savedIndex = localStorage.getItem('cekserp_cf_active_index');
     this.activeIndex = savedIndex ? parseInt(savedIndex, 10) : 0;
+    if (this.activeIndex >= this.endpoints.length) {
+      this.activeIndex = 0;
+    }
   }
 
   public setOnFailoverListener(cb: (oldEndpoint: string, newEndpoint: string, accountName: string) => void) {
@@ -23,8 +31,7 @@ class ApiGatewayManager {
   }
 
   public getActiveEndpoint(): string {
-    // If running relative in same origin or dist, handle fallback
-    const ep = this.endpoints[this.activeIndex] || this.endpoints[0] || '';
+    const ep = this.endpoints[this.activeIndex] ?? '';
     return ep.replace(/\/$/, '');
   }
 
@@ -33,7 +40,8 @@ class ApiGatewayManager {
   }
 
   public getActiveAccountName(): string {
-    return this.activeIndex === 0 ? 'Akun Utama (Cloudflare A)' : `Akun Cadangan (Cloudflare B #${this.activeIndex})`;
+    if (this.endpoints[this.activeIndex] === '') return 'Localhost Node (SQLite lokal)';
+    return this.activeIndex === 1 ? 'Akun Utama (Cloudflare A)' : `Akun Cadangan (Cloudflare B #${this.activeIndex})`;
   }
 
   public setEndpoints(newEndpoints: string[]) {
