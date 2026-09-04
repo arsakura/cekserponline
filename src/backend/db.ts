@@ -441,8 +441,8 @@ export class DatabaseService {
 
   async incrementKeyUsage(id: string): Promise<void> {
     const now = new Date().toISOString();
-    if (this.db) {
-      await this.db.prepare('UPDATE api_keys SET usage_count = usage_count + 1, last_used_at = ? WHERE id = ?').bind(now, id).run();
+    if (this.turso || this.db) {
+      await this.executeSql('UPDATE api_keys SET usage_count = usage_count + 1, last_used_at = ? WHERE id = ?', [now, id]);
     } else {
       const key = mockApiKeys.find(k => k.id === id);
       if (key) {
@@ -454,13 +454,14 @@ export class DatabaseService {
 
   async updateApiKeyQuota(userId: string, id: string, remainingQuota: number, totalQuota: number, planName: string): Promise<ApiKeyItem | null> {
     const now = new Date().toISOString();
-    if (this.db) {
+    if (this.turso || this.db) {
       try {
-        await this.db.prepare(
-          'UPDATE api_keys SET remaining_quota = ?, total_quota = ?, quota_updated_at = ?, plan_name = ? WHERE id = ? AND user_id = ?'
-        ).bind(remainingQuota, totalQuota, now, planName, id, userId).run();
+        await this.executeSql(
+          'UPDATE api_keys SET remaining_quota = ?, total_quota = ?, quota_updated_at = ?, plan_name = ? WHERE id = ? AND user_id = ?',
+          [remainingQuota, totalQuota, now, planName, id, userId]
+        );
       } catch (e) {
-        console.warn('D1 Quota columns update warning:', e);
+        console.warn('Quota columns update warning:', e);
       }
     }
 
@@ -541,15 +542,14 @@ export class DatabaseService {
   }
 
   async getProjectById(id: string): Promise<ProjectItem | null> {
-    if (this.db) {
-      const result = await this.db.prepare(`
+    if (this.turso || this.db) {
+      return await this.queryFirst<ProjectItem>(`
         SELECT p.*, c.name as category_name, u.name as user_name, u.email as user_email
         FROM projects p
         LEFT JOIN categories c ON p.category_id = c.id
         LEFT JOIN users u ON p.user_id = u.id
         WHERE p.id = ?
-      `).bind(id).first<ProjectItem>();
-      return result || null;
+      `, [id]);
     }
     const p = mockProjects.find(item => item.id === id);
     if (!p) return null;
@@ -584,10 +584,11 @@ export class DatabaseService {
       updated_at: now
     };
 
-    if (this.db) {
-      await this.db.prepare(
-        'INSERT INTO projects (id, user_id, category_id, name, target_url, country_code, language_code, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-      ).bind(newItem.id, newItem.user_id, newItem.category_id, newItem.name, newItem.target_url, newItem.country_code, newItem.language_code, newItem.created_at, newItem.updated_at).run();
+    if (this.turso || this.db) {
+      await this.executeSql(
+        'INSERT INTO projects (id, user_id, category_id, name, target_url, country_code, language_code, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [newItem.id, newItem.user_id, newItem.category_id, newItem.name, newItem.target_url, newItem.country_code, newItem.language_code, newItem.created_at, newItem.updated_at]
+      );
     } else {
       mockProjects.push(newItem);
     }
@@ -595,10 +596,10 @@ export class DatabaseService {
   }
 
   async deleteProject(id: string): Promise<boolean> {
-    if (this.db) {
-      await this.db.prepare('DELETE FROM keywords WHERE project_id = ?').bind(id).run();
-      await this.db.prepare('DELETE FROM serp_history WHERE project_id = ?').bind(id).run();
-      await this.db.prepare('DELETE FROM projects WHERE id = ?').bind(id).run();
+    if (this.turso || this.db) {
+      await this.executeSql('DELETE FROM keywords WHERE project_id = ?', [id]);
+      await this.executeSql('DELETE FROM serp_history WHERE project_id = ?', [id]);
+      await this.executeSql('DELETE FROM projects WHERE id = ?', [id]);
     } else {
       mockProjects = mockProjects.filter(p => p.id !== id);
       mockKeywords = mockKeywords.filter(k => k.project_id !== id);
@@ -782,21 +783,21 @@ export class DatabaseService {
 
   // --- LOGBOOKS ---
   async getLogbooks(userId: string, role: 'admin' | 'user'): Promise<LogbookItem[]> {
-    if (this.db) {
+    if (this.turso || this.db) {
       let query = `
         SELECT l.*, p.name as project_name, u.name as user_name
         FROM logbooks l
         JOIN projects p ON l.project_id = p.id
         JOIN users u ON l.user_id = u.id
       `;
+      const bindings: any[] = [];
       if (role !== 'admin') {
         query += ` WHERE l.user_id = ?`;
+        bindings.push(userId);
       }
       query += ` ORDER BY l.created_at DESC`;
       
-      const stmt = this.db.prepare(query);
-      const { results } = role !== 'admin' ? await stmt.bind(userId).all<LogbookItem>() : await stmt.all<LogbookItem>();
-      return results || [];
+      return await this.queryAll<LogbookItem>(query, bindings);
     }
 
     return mockLogbooks
@@ -817,11 +818,11 @@ export class DatabaseService {
     const id = crypto.randomUUID();
     const createdAt = new Date().toISOString();
     
-    if (this.db) {
-      await this.db.prepare(`
+    if (this.turso || this.db) {
+      await this.executeSql(`
         INSERT INTO logbooks (id, user_id, project_id, keyword_id, action_type, description, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).bind(id, userId, projectId, keywordId, actionType, description, createdAt).run();
+      `, [id, userId, projectId, keywordId, actionType, description, createdAt]);
     } else {
       mockLogbooks.push({ id, user_id: userId, project_id: projectId, keyword_id: keywordId, action_type: actionType, description, created_at: createdAt });
     }
@@ -830,15 +831,14 @@ export class DatabaseService {
   }
 
   async updateLogbook(id: string, userId: string, role: 'admin' | 'user', actionType: string, description: string): Promise<boolean> {
-    if (this.db) {
+    if (this.turso || this.db) {
       let query = 'UPDATE logbooks SET action_type = ?, description = ? WHERE id = ?';
       const bindings: any[] = [actionType, description, id];
       if (role !== 'admin') {
         query += ' AND user_id = ?';
         bindings.push(userId);
       }
-      const stmt = this.db.prepare(query);
-      await stmt.bind(...bindings).run();
+      await this.executeSql(query, bindings);
       return true;
     } else {
       const idx = mockLogbooks.findIndex(l => l.id === id && (role === 'admin' || l.user_id === userId));
@@ -851,11 +851,11 @@ export class DatabaseService {
   }
 
   async deleteLogbook(id: string, userId: string, role: 'admin' | 'user'): Promise<boolean> {
-    if (this.db) {
+    if (this.turso || this.db) {
       if (role === 'admin') {
-        await this.db.prepare('DELETE FROM logbooks WHERE id = ?').bind(id).run();
+        await this.executeSql('DELETE FROM logbooks WHERE id = ?', [id]);
       } else {
-        await this.db.prepare('DELETE FROM logbooks WHERE id = ? AND user_id = ?').bind(id, userId).run();
+        await this.executeSql('DELETE FROM logbooks WHERE id = ? AND user_id = ?', [id, userId]);
       }
       return true;
     } else {
