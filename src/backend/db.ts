@@ -211,25 +211,28 @@ export class DatabaseService {
 
   // --- USERS ---
   async getUsers(): Promise<UserItem[]> {
-    if (this.db) {
-      const { results } = await this.db.prepare('SELECT id, email, name, role, created_at FROM users ORDER BY created_at DESC').all<UserItem>();
-      return results || [];
+    if (this.turso || this.db) {
+      return await this.queryAll<UserItem>('SELECT id, email, name, role, created_at FROM users ORDER BY created_at DESC');
     }
     return mockUsers.map(({ password_hash, ...u }) => u);
   }
 
   async getUserByEmail(email: string): Promise<UserItem | null> {
-    if (this.db) {
-      const result = await this.db.prepare('SELECT * FROM users WHERE LOWER(email) = LOWER(?)').bind(email.trim()).first<UserItem>();
-      return result || null;
+    if (this.turso || this.db) {
+      return await this.queryFirst<UserItem>(
+        'SELECT * FROM users WHERE LOWER(email) = LOWER(?)',
+        [email.trim()]
+      );
     }
     return mockUsers.find(u => u.email.toLowerCase() === email.trim().toLowerCase()) || null;
   }
 
   async getUserById(id: string): Promise<UserItem | null> {
-    if (this.db) {
-      const result = await this.db.prepare('SELECT id, email, name, role, created_at FROM users WHERE id = ?').bind(id).first<UserItem>();
-      return result || null;
+    if (this.turso || this.db) {
+      return await this.queryFirst<UserItem>(
+        'SELECT id, email, name, role, created_at FROM users WHERE id = ?',
+        [id]
+      );
     }
     const found = mockUsers.find(u => u.id === id);
     if (!found) return null;
@@ -253,10 +256,11 @@ export class DatabaseService {
       created_at: new Date().toISOString()
     };
 
-    if (this.db) {
-      await this.db.prepare(
-        'INSERT INTO users (id, email, password_hash, name, role, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-      ).bind(newItem.id, newItem.email, newItem.password_hash, newItem.name, newItem.role, newItem.created_at).run();
+    if (this.turso || this.db) {
+      await this.executeSql(
+        'INSERT INTO users (id, email, password_hash, name, role, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [newItem.id, newItem.email, newItem.password_hash, newItem.name, newItem.role, newItem.created_at]
+      );
     } else {
       mockUsers.push(newItem);
     }
@@ -266,9 +270,9 @@ export class DatabaseService {
   }
 
   async deleteUser(id: string): Promise<boolean> {
-    if (this.db) {
-      await this.db.prepare('DELETE FROM api_keys WHERE user_id = ?').bind(id).run();
-      await this.db.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
+    if (this.turso || this.db) {
+      await this.executeSql('DELETE FROM api_keys WHERE user_id = ?', [id]);
+      await this.executeSql('DELETE FROM users WHERE id = ?', [id]);
     } else {
       mockUsers = mockUsers.filter(u => u.id !== id);
       mockProjects = mockProjects.filter(p => p.user_id !== id);
@@ -289,15 +293,17 @@ export class DatabaseService {
       hash = await hashPassword(newPasswordPlain.trim());
     }
 
-    if (this.db) {
+    if (this.turso || this.db) {
       if (hash) {
-        await this.db.prepare(
-          'UPDATE users SET name = ?, email = ?, role = ?, password_hash = ? WHERE id = ?'
-        ).bind(name.trim(), email.trim().toLowerCase(), role, hash, id).run();
+        await this.executeSql(
+          'UPDATE users SET name = ?, email = ?, role = ?, password_hash = ? WHERE id = ?',
+          [name.trim(), email.trim().toLowerCase(), role, hash, id]
+        );
       } else {
-        await this.db.prepare(
-          'UPDATE users SET name = ?, email = ?, role = ? WHERE id = ?'
-        ).bind(name.trim(), email.trim().toLowerCase(), role, id).run();
+        await this.executeSql(
+          'UPDATE users SET name = ?, email = ?, role = ? WHERE id = ?',
+          [name.trim(), email.trim().toLowerCase(), role, id]
+        );
       }
     } else {
       const user = mockUsers.find(u => u.id === id);
