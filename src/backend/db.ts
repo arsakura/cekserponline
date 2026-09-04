@@ -157,6 +157,15 @@ export class DatabaseService {
       } catch (e) {
         console.error('[Turso] Failed to initialize client:', e);
       }
+    } else if (!this.db) {
+      // Localhost fallback: Use local SQLite database file (cekserp.db)
+      try {
+        this.turso = createClient({
+          url: 'file:cekserp.db'
+        });
+      } catch (e) {
+        console.error('[Local SQLite] Failed to initialize local db file:', e);
+      }
     }
 
     seedDefaultData();
@@ -307,7 +316,7 @@ export class DatabaseService {
 
   // --- CATEGORIES ---
   async getCategories(userId: string, role: 'admin' | 'user'): Promise<CategoryItem[]> {
-    if (this.db) {
+    if (this.turso || this.db) {
       let query = `
         SELECT c.*, u.name as user_name,
                (SELECT COUNT(*) FROM projects p WHERE p.category_id = c.id) as project_count
@@ -315,12 +324,11 @@ export class DatabaseService {
         LEFT JOIN users u ON c.user_id = u.id
       `;
       if (role !== 'admin') {
-        query += ` WHERE c.user_id = ? OR c.user_id = 'admin-01'`;
-        const { results } = await this.db.prepare(query + ` ORDER BY c.name ASC`).bind(userId).all<CategoryItem>();
-        return results || [];
+        query += ` WHERE c.user_id = ? OR c.user_id = 'admin-01' ORDER BY c.name ASC`;
+        return await this.queryAll<CategoryItem>(query, [userId]);
       } else {
-        const { results } = await this.db.prepare(query + ` ORDER BY c.name ASC`).all<CategoryItem>();
-        return results || [];
+        query += ` ORDER BY c.name ASC`;
+        return await this.queryAll<CategoryItem>(query);
       }
     }
 
@@ -347,10 +355,11 @@ export class DatabaseService {
       project_count: 0
     };
 
-    if (this.db) {
-      await this.db.prepare(
-        'INSERT INTO categories (id, user_id, name, description, created_at) VALUES (?, ?, ?, ?, ?)'
-      ).bind(newItem.id, newItem.user_id, newItem.name, newItem.description, newItem.created_at).run();
+    if (this.turso || this.db) {
+      await this.executeSql(
+        'INSERT INTO categories (id, user_id, name, description, created_at) VALUES (?, ?, ?, ?, ?)',
+        [newItem.id, newItem.user_id, newItem.name, newItem.description, newItem.created_at]
+      );
     } else {
       mockCategories.push(newItem);
     }
@@ -358,8 +367,8 @@ export class DatabaseService {
   }
 
   async deleteCategory(id: string): Promise<boolean> {
-    if (this.db) {
-      await this.db.prepare('DELETE FROM categories WHERE id = ?').bind(id).run();
+    if (this.turso || this.db) {
+      await this.executeSql('DELETE FROM categories WHERE id = ?', [id]);
     } else {
       mockCategories = mockCategories.filter(c => c.id !== id);
     }
@@ -368,11 +377,11 @@ export class DatabaseService {
 
   // --- PER-USER API KEYS ---
   async getApiKeys(userId: string): Promise<ApiKeyItem[]> {
-    if (this.db) {
-      const { results } = await this.db.prepare(
-        'SELECT * FROM api_keys WHERE user_id = ? ORDER BY created_at ASC'
-      ).bind(userId).all<ApiKeyItem>();
-      return results || [];
+    if (this.turso || this.db) {
+      return await this.queryAll<ApiKeyItem>(
+        'SELECT * FROM api_keys WHERE user_id = ? ORDER BY created_at ASC',
+        [userId]
+      );
     }
     return mockApiKeys.filter(k => k.user_id === userId);
   }
@@ -471,7 +480,7 @@ export class DatabaseService {
 
   // --- PROJECTS ---
   async getProjects(userId: string, role: 'admin' | 'user', filterCategoryId?: string, filterUserId?: string): Promise<ProjectItem[]> {
-    if (this.db) {
+    if (this.turso || this.db) {
       let query = `
         SELECT p.*, c.name as category_name, u.name as user_name, u.email as user_email,
                (SELECT COUNT(*) FROM keywords k WHERE k.project_id = p.id) as keyword_count
@@ -500,9 +509,7 @@ export class DatabaseService {
       }
       query += ` ORDER BY p.created_at DESC`;
 
-      const stmt = this.db.prepare(query);
-      const { results } = bindings.length > 0 ? await stmt.bind(...bindings).all<ProjectItem>() : await stmt.all<ProjectItem>();
-      return results || [];
+      return await this.queryAll<ProjectItem>(query, bindings);
     }
 
     return mockProjects
@@ -855,26 +862,13 @@ export class DatabaseService {
 
   // --- NEWSTICKER METHODS ---
   async getNewsTickers(activeOnly = false): Promise<NewsTickerItem[]> {
-    if (this.db) {
-      try {
-        await this.db.prepare(`
-          CREATE TABLE IF NOT EXISTS newstickers (
-            id TEXT PRIMARY KEY,
-            content TEXT NOT NULL,
-            is_active INTEGER DEFAULT 1,
-            created_at TEXT DEFAULT (datetime('now'))
-          )
-        `).run();
-      } catch (e) {}
-
+    if (this.turso || this.db) {
       let query = 'SELECT * FROM newstickers';
       if (activeOnly) {
         query += ' WHERE is_active = 1';
       }
       query += ' ORDER BY created_at DESC';
-      const stmt = this.db.prepare(query);
-      const { results } = await stmt.all<NewsTickerItem>();
-      return results || [];
+      return await this.queryAll<NewsTickerItem>(query);
     } else {
       return mockNewsTickers
         .filter(t => !activeOnly || t.is_active === 1)
@@ -886,22 +880,11 @@ export class DatabaseService {
     const id = crypto.randomUUID();
     const createdAt = new Date().toISOString();
 
-    if (this.db) {
-      try {
-        await this.db.prepare(`
-          CREATE TABLE IF NOT EXISTS newstickers (
-            id TEXT PRIMARY KEY,
-            content TEXT NOT NULL,
-            is_active INTEGER DEFAULT 1,
-            created_at TEXT DEFAULT (datetime('now'))
-          )
-        `).run();
-      } catch (e) {}
-
-      await this.db.prepare(`
-        INSERT INTO newstickers (id, content, is_active, created_at)
-        VALUES (?, ?, ?, ?)
-      `).bind(id, content, isActive, createdAt).run();
+    if (this.turso || this.db) {
+      await this.executeSql(
+        'INSERT INTO newstickers (id, content, is_active, created_at) VALUES (?, ?, ?, ?)',
+        [id, content, isActive, createdAt]
+      );
     } else {
       mockNewsTickers.push({ id, content, is_active: isActive, created_at: createdAt });
     }
@@ -910,10 +893,11 @@ export class DatabaseService {
   }
 
   async updateNewsTicker(id: string, content: string, isActive: number): Promise<boolean> {
-    if (this.db) {
-      await this.db.prepare(`
-        UPDATE newstickers SET content = ?, is_active = ? WHERE id = ?
-      `).bind(content, isActive, id).run();
+    if (this.turso || this.db) {
+      await this.executeSql(
+        'UPDATE newstickers SET content = ?, is_active = ? WHERE id = ?',
+        [content, isActive, id]
+      );
     } else {
       const idx = mockNewsTickers.findIndex(t => t.id === id);
       if (idx !== -1) {
@@ -925,8 +909,8 @@ export class DatabaseService {
   }
 
   async deleteNewsTicker(id: string): Promise<boolean> {
-    if (this.db) {
-      await this.db.prepare('DELETE FROM newstickers WHERE id = ?').bind(id).run();
+    if (this.turso || this.db) {
+      await this.executeSql('DELETE FROM newstickers WHERE id = ?', [id]);
     } else {
       mockNewsTickers = mockNewsTickers.filter(t => t.id !== id);
     }
@@ -934,44 +918,14 @@ export class DatabaseService {
   }
 
   // --- FEATURED KEYWORDS METHODS ---
-  async ensureFeaturedKeywordsTable(): Promise<void> {
-    if (!this.db) return;
-    try {
-      await this.db.prepare(`
-        CREATE TABLE IF NOT EXISTS featured_keywords (
-          id TEXT PRIMARY KEY,
-          keyword TEXT NOT NULL UNIQUE,
-          is_active INTEGER DEFAULT 1,
-          last_checked_at TEXT,
-          top10_count INTEGER DEFAULT 0,
-          serp_data TEXT,
-          created_at TEXT DEFAULT (datetime('now'))
-        )
-      `).run();
-      try {
-        await this.db.prepare(`ALTER TABLE featured_keywords ADD COLUMN last_checked_at TEXT`).run();
-      } catch (e) {}
-      try {
-        await this.db.prepare(`ALTER TABLE featured_keywords ADD COLUMN top10_count INTEGER DEFAULT 0`).run();
-      } catch (e) {}
-      try {
-        await this.db.prepare(`ALTER TABLE featured_keywords ADD COLUMN serp_data TEXT`).run();
-      } catch (e) {}
-    } catch (e) {}
-  }
-
   async getFeaturedKeywords(activeOnly = false): Promise<FeaturedKeywordItem[]> {
-    if (this.db) {
-      await this.ensureFeaturedKeywordsTable();
-
+    if (this.turso || this.db) {
       let query = 'SELECT * FROM featured_keywords';
       if (activeOnly) {
         query += ' WHERE is_active = 1';
       }
       query += ' ORDER BY created_at DESC';
-      const stmt = this.db.prepare(query);
-      const { results } = await stmt.all<FeaturedKeywordItem>();
-      return results || [];
+      return await this.queryAll<FeaturedKeywordItem>(query);
     } else {
       return mockFeaturedKeywords
         .filter(t => !activeOnly || t.is_active === 1)
@@ -984,13 +938,11 @@ export class DatabaseService {
     const createdAt = new Date().toISOString();
     const cleanKw = keyword.trim();
 
-    if (this.db) {
-      await this.ensureFeaturedKeywordsTable();
-
-      await this.db.prepare(`
-        INSERT INTO featured_keywords (id, keyword, is_active, created_at)
-        VALUES (?, ?, ?, ?)
-      `).bind(id, cleanKw, isActive, createdAt).run();
+    if (this.turso || this.db) {
+      await this.executeSql(
+        'INSERT INTO featured_keywords (id, keyword, is_active, created_at) VALUES (?, ?, ?, ?)',
+        [id, cleanKw, isActive, createdAt]
+      );
     } else {
       mockFeaturedKeywords.push({ id, keyword: cleanKw, is_active: isActive, created_at: createdAt });
     }
@@ -1000,11 +952,11 @@ export class DatabaseService {
 
   async updateFeaturedKeyword(id: string, keyword: string, isActive: number): Promise<boolean> {
     const cleanKw = keyword.trim();
-    if (this.db) {
-      await this.ensureFeaturedKeywordsTable();
-      await this.db.prepare(`
-        UPDATE featured_keywords SET keyword = ?, is_active = ? WHERE id = ?
-      `).bind(cleanKw, isActive, id).run();
+    if (this.turso || this.db) {
+      await this.executeSql(
+        'UPDATE featured_keywords SET keyword = ?, is_active = ? WHERE id = ?',
+        [cleanKw, isActive, id]
+      );
     } else {
       const idx = mockFeaturedKeywords.findIndex(t => t.id === id);
       if (idx !== -1) {
@@ -1017,13 +969,11 @@ export class DatabaseService {
 
   async updateFeaturedKeywordSerpResult(id: string, top10Count: number, serpDataJson: string): Promise<boolean> {
     const now = new Date().toISOString();
-    if (this.db) {
-      await this.ensureFeaturedKeywordsTable();
-      await this.db.prepare(`
-        UPDATE featured_keywords 
-        SET last_checked_at = ?, top10_count = ?, serp_data = ? 
-        WHERE id = ?
-      `).bind(now, top10Count, serpDataJson, id).run();
+    if (this.turso || this.db) {
+      await this.executeSql(
+        'UPDATE featured_keywords SET last_checked_at = ?, top10_count = ?, serp_data = ? WHERE id = ?',
+        [now, top10Count, serpDataJson, id]
+      );
     } else {
       const idx = mockFeaturedKeywords.findIndex(t => t.id === id);
       if (idx !== -1) {
@@ -1036,9 +986,8 @@ export class DatabaseService {
   }
 
   async deleteFeaturedKeyword(id: string): Promise<boolean> {
-    if (this.db) {
-      await this.ensureFeaturedKeywordsTable();
-      await this.db.prepare('DELETE FROM featured_keywords WHERE id = ?').bind(id).run();
+    if (this.turso || this.db) {
+      await this.executeSql('DELETE FROM featured_keywords WHERE id = ?', [id]);
     } else {
       mockFeaturedKeywords = mockFeaturedKeywords.filter(t => t.id !== id);
     }

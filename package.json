@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "server": "tsx src/backend/localServer.ts",
+    "pull:legacy": "node pull_legacy_to_localhost.js",
+    "start:local": "node pull_legacy_to_localhost.js && tsx src/backend/localServer.ts",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "worker:dev": "wrangler dev src/backend/index.ts",
