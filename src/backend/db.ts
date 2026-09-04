@@ -602,8 +602,8 @@ export class DatabaseService {
 
   // --- KEYWORDS ---
   async getKeywordsByProject(project_id: string): Promise<KeywordItem[]> {
-    if (this.db) {
-      const { results } = await this.db.prepare(`
+    if (this.turso || this.db) {
+      return await this.queryAll<KeywordItem>(`
         SELECT k.*, 
           (SELECT position FROM serp_history sh WHERE sh.keyword_id = k.id ORDER BY checked_at DESC LIMIT 1) as latest_position,
           (SELECT position FROM serp_history sh WHERE sh.keyword_id = k.id ORDER BY checked_at DESC LIMIT 1 OFFSET 1) as previous_position,
@@ -613,8 +613,7 @@ export class DatabaseService {
         FROM keywords k
         WHERE k.project_id = ?
         ORDER BY k.created_at DESC
-      `).bind(project_id).all<KeywordItem>();
-      return results || [];
+      `, [project_id]);
     }
 
     return mockKeywords
@@ -633,7 +632,7 @@ export class DatabaseService {
   }
 
   async getAllKeywords(userId: string, role: 'admin' | 'user'): Promise<KeywordItem[]> {
-    if (this.db) {
+    if (this.turso || this.db) {
       let query = `
         SELECT k.*, 
           (SELECT position FROM serp_history sh WHERE sh.keyword_id = k.id ORDER BY checked_at DESC LIMIT 1) as latest_position,
@@ -642,13 +641,13 @@ export class DatabaseService {
         FROM keywords k
         JOIN projects p ON k.project_id = p.id
       `;
+      const bindings: any[] = [];
       if (role !== 'admin') {
         query += ` WHERE p.user_id = ?`;
+        bindings.push(userId);
       }
       query += ` ORDER BY k.created_at DESC`;
-      const stmt = this.db.prepare(query);
-      const { results } = role !== 'admin' ? await stmt.bind(userId).all<KeywordItem>() : await stmt.all<KeywordItem>();
-      return results || [];
+      return await this.queryAll<KeywordItem>(query, bindings);
     }
 
     const userProjIds = new Set(mockProjects.filter(p => role === 'admin' || p.user_id === userId).map(p => p.id));
@@ -677,8 +676,11 @@ export class DatabaseService {
         created_at: new Date().toISOString()
       };
 
-      if (this.db) {
-        await this.db.prepare('INSERT INTO keywords (id, project_id, keyword, created_at) VALUES (?, ?, ?, ?)').bind(item.id, item.project_id, item.keyword, item.created_at).run();
+      if (this.turso || this.db) {
+        await this.executeSql(
+          'INSERT INTO keywords (id, project_id, keyword, created_at) VALUES (?, ?, ?, ?)',
+          [item.id, item.project_id, item.keyword, item.created_at]
+        );
       } else {
         mockKeywords.push(item);
       }
@@ -688,9 +690,9 @@ export class DatabaseService {
   }
 
   async deleteKeyword(id: string): Promise<boolean> {
-    if (this.db) {
-      await this.db.prepare('DELETE FROM serp_history WHERE keyword_id = ?').bind(id).run();
-      await this.db.prepare('DELETE FROM keywords WHERE id = ?').bind(id).run();
+    if (this.turso || this.db) {
+      await this.executeSql('DELETE FROM serp_history WHERE keyword_id = ?', [id]);
+      await this.executeSql('DELETE FROM keywords WHERE id = ?', [id]);
     } else {
       mockKeywords = mockKeywords.filter(k => k.id !== id);
       mockHistory = mockHistory.filter(h => h.keyword_id !== id);
@@ -718,11 +720,11 @@ export class DatabaseService {
       checked_at: new Date().toISOString()
     };
 
-    if (this.db) {
-      await this.db.prepare(`
+    if (this.turso || this.db) {
+      await this.executeSql(`
         INSERT INTO serp_history (id, keyword_id, project_id, position, found_url, page_number, api_key_used, checked_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(item.id, item.keyword_id, item.project_id, item.position, item.found_url, item.page_number, item.api_key_used, item.checked_at).run();
+      `, [item.id, item.keyword_id, item.project_id, item.position, item.found_url, item.page_number, item.api_key_used, item.checked_at]);
     } else {
       mockHistory.push(item);
     }
@@ -730,7 +732,7 @@ export class DatabaseService {
   }
 
   async getAllHistory(userId: string, role: 'admin' | 'user'): Promise<SerpHistoryItem[]> {
-    if (this.db) {
+    if (this.turso || this.db) {
       let query = `
         SELECT sh.*, k.keyword, p.name as project_name, p.target_url, c.name as category_name, u.name as user_name
         FROM serp_history sh
@@ -739,13 +741,13 @@ export class DatabaseService {
         LEFT JOIN categories c ON p.category_id = c.id
         LEFT JOIN users u ON p.user_id = u.id
       `;
+      const bindings: any[] = [];
       if (role !== 'admin') {
         query += ` WHERE p.user_id = ?`;
+        bindings.push(userId);
       }
       query += ` ORDER BY sh.checked_at DESC`;
-      const stmt = this.db.prepare(query);
-      const { results } = role !== 'admin' ? await stmt.bind(userId).all<SerpHistoryItem>() : await stmt.all<SerpHistoryItem>();
-      return results || [];
+      return await this.queryAll<SerpHistoryItem>(query, bindings);
     }
 
     return mockHistory

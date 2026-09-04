@@ -9,7 +9,7 @@ const LEGACY_URL = 'https://cekserponline.muhammad-ardyan.workers.dev';
 const headers = { 'Authorization': 'Bearer admin-01' };
 
 async function main() {
-  console.log('🚀 Memulai ekspor data LENGKAP dari server legacy (https://cekserponline.muhammad-ardyan.workers.dev)...');
+  console.log('🚀 Memulai ekspor data TOTAL & ANALITIK dari server legacy (https://cekserponline.muhammad-ardyan.workers.dev)...');
 
   // Disable foreign keys temporarily during bulk import
   try { await client.execute('PRAGMA foreign_keys = OFF;'); } catch(e){}
@@ -122,7 +122,27 @@ async function main() {
     }
   }
 
-  // 6. Tarik NEWS TICKERS
+  // 6. Tarik SERP HISTORY (Riwayat Analitik Peringkat SERP)
+  console.log('📥 Menarik data Riwayat Analitik (SERP History)...');
+  let historyCount = 0;
+  try {
+    const resHist = await fetch(`${LEGACY_URL}/api/analytics/history`, { headers });
+    if (resHist.ok) {
+      const jsonHist = await resHist.json();
+      const historyList = jsonHist.data || [];
+      for (const h of historyList) {
+        await client.execute({
+          sql: 'INSERT OR REPLACE INTO serp_history (id, keyword_id, project_id, position, found_url, page_number, api_key_used, checked_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          args: [h.id, h.keyword_id, h.project_id, h.position ?? null, h.found_url ?? null, h.page_number ?? null, h.api_key_used ?? null, h.checked_at || new Date().toISOString()]
+        });
+        historyCount++;
+      }
+    }
+  } catch (e) {
+    console.warn('⚠️ Note History:', e.message);
+  }
+
+  // 7. Tarik NEWS TICKERS
   console.log('📥 Menarik data News Tickers...');
   let newstickersCount = 0;
   try {
@@ -142,7 +162,7 @@ async function main() {
     console.warn('⚠️ Note News Tickers:', e.message);
   }
 
-  // 7. Tarik FEATURED KEYWORDS
+  // 8. Tarik FEATURED KEYWORDS
   console.log('📥 Menarik data Featured Keywords...');
   let featuredCount = 0;
   try {
@@ -162,12 +182,13 @@ async function main() {
     console.warn('⚠️ Note Featured Keywords:', e.message);
   }
 
-  console.log('\n🎉 EKSPOR & IMPOR DATA DARI SERVER LEGACY BERHASIL 100% SUKSES!');
+  console.log('\n🎉 IMPOR SELURUH DATA HISTORIS & ANALITIK KE LOCALHOST SUKSES 100%!');
   console.log(`📊 Ringkasan Data Tersimpan di 'cekserp.db' (Localhost):
    - Users: ${usersCount}
    - Kategori: ${categories.length}
    - Proyek: ${projects.length}
    - Kata Kunci (Keywords): ${totalKeywords}
+   - Riwayat Analitik (SERP History): ${historyCount}
    - News Tickers: ${newstickersCount}
    - Featured Keywords: ${featuredCount}`);
 }
