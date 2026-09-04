@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 0.0.0.0",
     "server": "tsx src/backend/localServer.ts",
     "pull:legacy": "node pull_legacy_to_localhost.js",
     "start:local": "node pull_legacy_to_localhost.js && tsx src/backend/localServer.ts",
