@@ -99,13 +99,14 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </div>
 
-            {/* Logout Button */}
+            {/* Prominent Logout Button */}
             <button
               onClick={onLogout}
-              className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-slate-900 border border-slate-800 transition-colors"
-              title="Keluar / Logout"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-300 hover:text-white bg-rose-500/10 hover:bg-rose-600 border border-rose-500/30 transition-all shadow-sm cursor-pointer"
+              title="Keluar dari Akun"
             >
-              <LogOut size={16} />
+              <LogOut size={14} />
+              <span>Logout</span>
             </button>
 
           </div>

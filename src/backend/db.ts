@@ -409,10 +409,11 @@ export class DatabaseService {
       created_at: new Date().toISOString()
     };
 
-    if (this.db) {
-      await this.db.prepare(
-        'INSERT INTO api_keys (id, user_id, api_key, label, is_active, usage_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-      ).bind(newItem.id, newItem.user_id, newItem.api_key, newItem.label, newItem.is_active, newItem.usage_count, newItem.created_at).run();
+    if (this.turso || this.db) {
+      await this.executeSql(
+        'INSERT INTO api_keys (id, user_id, api_key, label, is_active, usage_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [newItem.id, newItem.user_id, newItem.api_key, newItem.label, newItem.is_active, newItem.usage_count, newItem.created_at]
+      );
     } else {
       mockApiKeys.push(newItem);
     }
@@ -420,8 +421,8 @@ export class DatabaseService {
   }
 
   async deleteApiKey(userId: string, id: string): Promise<boolean> {
-    if (this.db) {
-      await this.db.prepare('DELETE FROM api_keys WHERE id = ? AND user_id = ?').bind(id, userId).run();
+    if (this.turso || this.db) {
+      await this.executeSql('DELETE FROM api_keys WHERE id = ? AND user_id = ?', [id, userId]);
     } else {
       mockApiKeys = mockApiKeys.filter(k => !(k.id === id && k.user_id === userId));
     }
@@ -429,8 +430,8 @@ export class DatabaseService {
   }
 
   async toggleApiKey(userId: string, id: string, is_active: number): Promise<boolean> {
-    if (this.db) {
-      await this.db.prepare('UPDATE api_keys SET is_active = ? WHERE id = ? AND user_id = ?').bind(is_active, id, userId).run();
+    if (this.turso || this.db) {
+      await this.executeSql('UPDATE api_keys SET is_active = ? WHERE id = ? AND user_id = ?', [is_active, id, userId]);
     } else {
       const key = mockApiKeys.find(k => k.id === id && k.user_id === userId);
       if (key) key.is_active = is_active;
